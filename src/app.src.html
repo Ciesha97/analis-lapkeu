@@ -73,6 +73,12 @@ p { margin: 0; }
 .price { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px; min-width: 230px; }
 .price label { font-size: 0.8rem; color: var(--ink-2); font-weight: 600; }
 .price input { font: inherit; font-variant-numeric: tabular-nums; border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; background: var(--bg); color: var(--ink); width: 100%; }
+.valmini { font-size: 0.86rem; color: var(--ink); background: var(--accent-soft); border-radius: 6px; padding: 7px 9px; }
+.valmini a { color: var(--accent); font-weight: 600; }
+.jump { position: sticky; top: 0; z-index: 10; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 8px 0; background: var(--bg); border-bottom: 1px solid var(--line); }
+.jump a { flex: none; font-size: 0.85rem; font-weight: 600; color: var(--ink-2); text-decoration: none; padding: 5px 11px; border-radius: 99px; border: 1px solid var(--line); background: var(--paper); }
+.jump a:hover, .jump a:focus-visible { color: var(--accent); border-color: var(--accent); }
+.report > section { scroll-margin-top: 56px; }
 .status { font-size: 0.9rem; padding: 10px 14px; border-radius: 8px; background: var(--accent-soft); color: var(--ink); }
 .status.err { background: var(--bad-bg); color: var(--bad); }
 .sample-tag { display: inline-block; font-size: 0.75rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; background: var(--warn-bg); color: var(--warn); }
@@ -144,9 +150,21 @@ summary { cursor: pointer; font-weight: 600; color: var(--accent); }
 .notes { font-size: 0.86rem; color: var(--ink-2); display: grid; gap: 6px; max-width: 80ch; }
 .notes ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+/* phones: each ratio becomes a two-line card (name + rating, then both years and the trend) so nothing hides off-screen */
+@media (max-width: 560px) {
+  table.ratios, table.ratios tbody { display: block; }
+  table.ratios thead { display: none; }
+  table.ratios tr.group { display: block; }
+  table.ratios tr.group td { display: block; }
+  table.ratios tr.r { display: grid; grid-template-columns: auto auto 1fr; grid-template-areas: "n n ch" "p c t"; gap: 4px 14px; padding: 10px; border-bottom: 1px solid var(--line-2); }
+  table.ratios tr.r td { border: 0; padding: 0; text-align: left; }
+  table.ratios td.rn { grid-area: n; } table.ratios td.rch { grid-area: ch; justify-self: end; }
+  table.ratios td.rp { grid-area: p; color: var(--ink-3); } table.ratios td.rc { grid-area: c; } table.ratios td.rtr { grid-area: t; justify-self: end; }
+  table.ratios td.rp::before, table.ratios td.rc::before { content: attr(data-l) " "; font-size: 0.78rem; color: var(--ink-3); }
+}
 @media print {
   body { background: #fff; }
-  .tool, .actions, details summary { display: none; }
+  .tool, .actions, details summary, .jump { display: none; }
   /* grid containers split across pages let the next block overlap the end of a long table, so print uses plain blocks */
   .wrap, .report, .sheet { display: block; }
   .report > * + * { margin-top: 28px; }
@@ -177,6 +195,7 @@ summary { cursor: pointer; font-weight: 600; color: var(--accent); }
         <label for="shares">Jumlah saham beredar (opsional)</label>
         <input id="shares" type="text" inputmode="numeric" placeholder="otomatis dari EPS" autocomplete="off">
         <span class="muted" style="font-size:.78rem">Untuk PER, PBV, dan kapitalisasi pasar.</span>
+        <div id="valmini" class="valmini" aria-live="polite" hidden></div>
       </div>
     </div>
     <div id="status" class="status" role="status">Menampilkan contoh: laporan tahunan 2025 PT Astra Agro Lestari Tbk (AALI). Unggah file Anda untuk menganalisis emiten lain.</div>
@@ -1066,13 +1085,13 @@ function render(ex) {
       if (A.bank && ['gpm', 'opm', 'icr', 'dte', 'nde', 'fcfm', 'capexrev'].includes(r.k)) return '';
       const skip = A.financial && ['cr', 'qr', 'cashr', 'dte', 'nde', 'icr', 'dso', 'dio', 'dpo', 'ccc', 'der', 'dar', 'cfoni', 'fcfm', 'npm'].includes(r.k);
       const rt = skip ? null : rate(r, c, rc.negEq);
-      return `<tr><td>${esc(r.n)}<span class="f">${esc(r.f)}</span></td><td class="n">${fR(r, p)}</td><td class="n"><b>${fR(r, c)}</b></td><td class="n">${trendCell(r, c, p)}</td><td>${rt ? `<span class="chip ${rt}">${RATE_TXT[rt]}</span>` : '<span class="chip na">Info</span>'}</td></tr>`;
+      return `<tr class="r"><td class="rn">${esc(r.n)}<span class="f">${esc(r.f)}</span></td><td class="n rp" data-l="${py}">${fR(r, p)}</td><td class="n rc" data-l="${cy}"><b>${fR(r, c)}</b></td><td class="n rtr">${trendCell(r, c, p)}</td><td class="rch">${rt ? `<span class="chip ${rt}">${RATE_TXT[rt]}</span>` : '<span class="chip na">Info</span>'}</td></tr>`;
     }).join('');
     return rows ? `<tr class="group"><td colspan="5">${grp.g}</td></tr>${rows}` : '';
   }).join('');
 
   // valuation
-  let valHtml = '';
+  let valHtml = '', mini = '';
   const sharesIn = parsePrice($('#shares').value);
   const shares = sharesIn || S.shares?.c;
   if (price && isNum(shares)) {
@@ -1082,7 +1101,8 @@ function render(ex) {
     // multiples on a loss or on negative equity are not meaningful
     const per = epsAnn > 0 ? div(price, epsAnn) : null, pbv = bvps > 0 ? div(price, bvps) : null;
     const dy = isNum(S.divpaid?.c) ? S.divpaid.c / shares / price : null;
-    valHtml = `<section class="sheet"><h2>Valuasi pada harga Rp${nf(0).format(price)}</h2>
+    mini = `PER ${isNum(per) ? nf(1).format(per) + 'x' : '–'} · PBV ${isNum(pbv) ? nf(2).format(pbv) + 'x' : '–'} · kapitalisasi ${money(mcap, 'IDR')}. <a href="#valuasi">Rincian valuasi</a>`;
+    valHtml = `<section class="sheet" id="valuasi"><h2>Valuasi pada harga Rp${nf(0).format(price)}</h2>
       <div class="tablewrap"><table><thead><tr><th>Ukuran</th><th class="n">Nilai</th><th>Catatan</th></tr></thead><tbody>
       <tr><td>Jumlah saham${sharesIn ? '' : ' (perkiraan)'}</td><td class="n">${nf(0).format(shares)}</td><td class="muted">${sharesIn ? 'Sesuai isian Anda' : 'Laba ke induk ÷ EPS dasar, yaitu rata-rata tertimbang. Bila ada saham baru di tengah tahun, isi jumlah saham beredar agar lebih tepat.'}</td></tr>
       <tr><td>Kapitalisasi pasar</td><td class="n">${money(mcap, 'IDR')}</td><td class="muted">Harga × jumlah saham</td></tr>
@@ -1092,7 +1112,8 @@ function render(ex) {
       <tr><td>Dividend yield (historis)</td><td class="n">${pct(dy)}</td><td class="muted">Dividen yang dibayar pada periode ini ÷ saham ÷ harga</td></tr>
       </tbody></table></div>
       ${M.currency === 'USD' ? '<p class="muted">Laporan dalam US$: valuasi di atas hanya benar bila harga diisi dalam mata uang yang sama.</p>' : ''}</section>`;
-  } else if (price) valHtml = `<section class="sheet"><h2>Valuasi</h2><p class="muted">Laba per saham tidak terbaca dari file ini, jadi jumlah saham tidak dapat diperkirakan dan PER/PBV belum bisa dihitung.</p></section>`;
+  } else if (price) mini = 'PER dan PBV belum bisa dihitung: laba per saham tidak terbaca dari file ini. Isi jumlah saham beredar untuk menghitungnya.';
+  if (price && !isNum(shares)) valHtml = `<section class="sheet" id="valuasi"><h2>Valuasi</h2><p class="muted">Laba per saham tidak terbaca dari file ini, jadi jumlah saham tidak dapat diperkirakan dan PER/PBV belum bisa dihitung.</p></section>`;
 
   // per-share items stay in rupiah, everything else in the report unit
   const fS = (k, v) => ITEMS[k]?.noscale ? (isNum(v) ? nf(2).format(v) : '–') : fU(v);
@@ -1116,7 +1137,11 @@ function render(ex) {
   ${missing.length ? `<div class="status err">Beberapa pos utama tidak terbaca: ${esc(missing.join(', '))}. Rasio yang membutuhkannya ditampilkan "–". ${M.source.startsWith('PDF') ? 'Untuk hasil paling akurat gunakan file Excel XBRL dari idx.co.id.' : ''}</div>` : ''}
   ${A.bank ? `<div class="status">Laporan bank: analisis memakai rasio perbankan (LDR, CASA, NIM, CIR, biaya kredit). CAR, NPL, dan LCR tidak ada di laporan keuangan utama, jadi tidak dihitung di sini; angka resminya ada di laporan publikasi bank.</div>` : A.financial ? `<div class="status">Emiten ini tampaknya bergerak di sektor keuangan. Rasio likuiditas dan utang untuk perusahaan umum kurang relevan untuk bank atau perusahaan pembiayaan, jadi tidak diberi penilaian.</div>` : ''}
 
-  <section class="sheet">
+  <nav class="jump" aria-label="Bagian laporan">
+    <a href="#ringkasan">Ringkasan</a><a href="#kinerja">Kinerja</a><a href="#angka">Angka kunci</a>${isNum(S.ta?.c) ? '<a href="#neraca">Neraca</a>' : ''}<a href="#rasio">Rasio</a>${valHtml ? '<a href="#valuasi">Valuasi</a>' : ''}<a href="#sumber">Sumber angka</a>
+  </nav>
+
+  <section class="sheet" id="ringkasan">
     <h2>Ringkasan</h2>
     <div class="summary">
       <div class="narr">${N.paras.map(p => `<p>${esc(p)}</p>`).join('')}</div>
@@ -1137,28 +1162,28 @@ function render(ex) {
     </div>
   </section>
 
-  <section class="sheet chart">
+  <section class="sheet chart" id="kinerja">
     <h2>Kinerja ${py} vs ${cy}</h2>
     <div class="legend"><span><i style="background:var(--series-prev)"></i>${py}</span><span><i style="background:var(--series-cur)"></i>${cy}</span><span class="muted">dalam ${UNIT.name}</span></div>
     ${chartSvg(A, py, cy)}
   </section>
 
-  <section class="sheet">
+  <section class="sheet" id="angka">
     <h2>Angka kunci</h2>
     <div class="tablewrap"><table><thead><tr><th>Pos (dalam ${UNIT.name})</th><th class="n">${py}</th><th class="n">${cy}</th><th class="n">Perubahan</th></tr></thead><tbody>${keyHtml}</tbody></table></div>
   </section>
 
   ${neracaHtml(ex, A, py, cy)}
 
-  <section class="sheet">
+  <section class="sheet" id="rasio">
     <h2>Rasio keuangan</h2>
-    <div class="tablewrap"><table><thead><tr><th>Rasio</th><th class="n">${py}</th><th class="n">${cy}</th><th class="n">Tren</th><th>Penilaian</th></tr></thead><tbody>${ratioHtml}</tbody></table></div>
+    <div class="tablewrap"><table class="ratios"><thead><tr><th>Rasio</th><th class="n">${py}</th><th class="n">${cy}</th><th class="n">Tren</th><th>Penilaian</th></tr></thead><tbody>${ratioHtml}</tbody></table></div>
     <p class="muted" style="font-size:.84rem">Penilaian memakai patokan umum lintas industri, jadi bandingkan juga dengan emiten sejenis. Rasio berbasis aset dan ekuitas memakai saldo akhir periode${A.ann !== 1 ? '; pos laba rugi disetahunkan' : ''}.</p>
   </section>
 
   ${valHtml}
 
-  <section class="sheet">
+  <section class="sheet" id="sumber">
     <h2>Dari mana angka ini</h2>
     <details><summary>Lihat pos yang terbaca dari file</summary>
       <div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Pos standar</th><th class="n">${py}</th><th class="n">${cy}</th><th>Sumber di laporan</th></tr></thead><tbody>${srcRows}</tbody></table></div>
@@ -1175,6 +1200,8 @@ function render(ex) {
     </div>
   </section>`;
 
+  $('#valmini').innerHTML = mini;
+  $('#valmini').hidden = !mini;
   $('#copy').onclick = () => copySummary(A, N);
   try { if (window.self === window.top) { $('#print').hidden = false; $('#print').onclick = () => window.print(); } } catch (e) {}
   bindTips();
@@ -1223,7 +1250,7 @@ function neracaHtml(ex, A, py, cy) {
     ? `<tr class="group"><td colspan="3">${esc(r.h)}</td></tr>`
     : `<tr class="${r.grand ? 'grand' : r.total ? 'total' : ''}"><td>${esc(r.label)}</td><td class="n">${fU(isNum(r.p) ? r.p * mul : null)}</td><td class="n">${fU(isNum(r.c) ? r.c * mul : null)}</td></tr>`).join('');
   const diff = per => balanceGap(S, per);
-  return `<section class="sheet">
+  return `<section class="sheet" id="neraca">
     <h2>Neraca</h2>
     <p class="eq">Aset ${money(S.ta.c, c)} = Liabilitas ${money(tl, c)}${isNum(S.syirkah?.c) && S.syirkah.c ? ` + Dana syirkah temporer ${money(S.syirkah.c, c)}` : ''} + Ekuitas ${money(te, c)}</p>
     <p class="muted" style="font-size:.86rem">Posisi per ${esc(dateId(A.meta.periodEnd))}. ${isNum(tl) ? `${pct(tl / S.ta.c)} aset dibiayai liabilitas dan ${pct(te / S.ta.c)} oleh ekuitas.` : ''}</p>

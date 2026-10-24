@@ -256,6 +256,18 @@ const halamanLapkeu = (judul, satuan, baris) => `<section style="page-break-afte
   const { p: ph } = await bukaHalaman(hp);
   const lebar = await ph.evaluate(() => [document.documentElement.clientWidth, document.documentElement.scrollWidth]);
   cek('ponsel 390px: lebar mengikuti layar tanpa geser samping', lebar[0] === 390 && lebar[1] <= 390, JSON.stringify(lebar));
+  const kartu = await ph.evaluate(() => {
+    const t = document.querySelector('table.ratios'), chip = t.querySelector('tr.r .chip').getBoundingClientRect();
+    return { muat: t.scrollWidth <= t.parentElement.clientWidth, chipTerlihat: chip.right <= document.documentElement.clientWidth && chip.width > 0 };
+  });
+  cek('ponsel: tabel rasio muat di layar dan penilaian terlihat', kartu.muat && kartu.chipTerlihat, JSON.stringify(kartu));
+  const lompat = await ph.evaluate(() => [...document.querySelectorAll('.jump a')].map(a => [a.getAttribute('href'), !!document.querySelector(a.getAttribute('href'))]));
+  cek('menu lompat: setiap tautan punya bagian tujuan', lompat.length >= 5 && lompat.every(([, ada]) => ada), JSON.stringify(lompat));
+  await ph.fill('#price', '5.950');
+  const ringkas = await ph.evaluate(() => ({ teks: document.querySelector('#valmini').textContent, tampil: !document.querySelector('#valmini').hidden, tujuan: !!document.querySelector('#valuasi') }));
+  cek('isi harga: PER dan PBV langsung tampil di bawah kotak harga', ringkas.tampil && /PER \d/.test(ringkas.teks) && /PBV \d/.test(ringkas.teks) && ringkas.tujuan, JSON.stringify(ringkas));
+  await ph.fill('#price', '');
+  cek('isi harga dikosongkan: ringkasan disembunyikan', await ph.evaluate(() => document.querySelector('#valmini').hidden), 'masih tampil');
 
   await b.close();
   fs.rmSync(tmp, { recursive: true, force: true });
