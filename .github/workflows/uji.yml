@@ -1,0 +1,31 @@
+# Uji setiap perubahan: index.html sesuai sumber, hash pustaka CDN cocok, dan uji regresi di Chromium.
+name: Uji
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  uji:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: index.html sesuai sumber
+        run: |
+          python3 tools/build.py
+          git diff --exit-code -- index.html
+      - name: Cek hash pustaka CDN
+        run: bash tools/cek-sri.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pasang Playwright
+        run: |
+          npm install --no-save --no-package-lock playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Uji regresi
+        run: node tools/uji-regresi.js

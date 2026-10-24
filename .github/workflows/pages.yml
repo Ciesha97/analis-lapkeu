@@ -1,0 +1,45 @@
+# Menerbitkan Analis Lapkeu ke GitHub Pages setelah workflow "Uji" lolos di main.
+# Sekali saja: Settings > Pages > Build and deployment > Source: "GitHub Actions".
+name: Terbitkan ke GitHub Pages
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Uji]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  terbitkan:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Siapkan situs
+        run: |
+          python3 tools/build.py
+          git diff --exit-code -- index.html
+          mkdir -p _site/contoh-laporan
+          cp index.html _site/index.html
+          cp contoh-laporan/*.pdf _site/contoh-laporan/
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4
