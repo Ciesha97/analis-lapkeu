@@ -45,7 +45,7 @@ tools/uji.js          Cetak isi laporan untuk satu file (Playwright)
 tools/uji-regresi.js  Uji regresi otomatis (Playwright)
 tools/data-uji.json   Data perusahaan fiktif untuk uji regresi
 tools/cek-sri.sh      Cek hash integrity pustaka CDN di index.html
-contoh-laporan/       Contoh laporan hasil program (AALI, BBCA)
+contoh-laporan/       Contoh laporan hasil program (AALI)
 .github/workflows/    Uji di setiap push, terbitkan ke GitHub Pages setelah uji lolos di main
 ```
 
