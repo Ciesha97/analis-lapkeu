@@ -147,10 +147,15 @@ summary { cursor: pointer; font-weight: 600; color: var(--accent); }
 @media print {
   body { background: #fff; }
   .tool, .actions, details summary { display: none; }
+  /* grid containers split across pages let the next block overlap the end of a long table, so print uses plain blocks */
+  .wrap, .report, .sheet { display: block; }
+  .report > * + * { margin-top: 28px; }
+  .sheet > * + * { margin-top: 18px; }
   .sheet { border: none; padding: 0; }
   tr, .score, .chart { break-inside: avoid; }
-  details > * { display: block; }
 }
+/* print the collapsed source table too (Chrome; other browsers are opened on beforeprint) */
+@media print { details::details-content { content-visibility: visible; display: block; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -1332,6 +1337,9 @@ const drop = $('#drop');
 ['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
 drop.addEventListener('drop', e => handleFile(e.dataTransfer.files[0]));
 ['#price', '#shares'].forEach(id => $(id).addEventListener('input', () => { if (LAST_EX) render(LAST_EX); }));
+// open collapsed sections for printing and close them again afterwards
+addEventListener('beforeprint', () => document.querySelectorAll('details:not([open])').forEach(d => { d.open = true; d.dataset.printOpen = ''; }));
+addEventListener('afterprint', () => document.querySelectorAll('details[data-print-open]').forEach(d => { d.open = false; delete d.dataset.printOpen; }));
 
 if (SAMPLE) { SAMPLE_EX = extractExcel(SAMPLE); LAST_EX = SAMPLE_EX; render(SAMPLE_EX); }
 window.__analis = { parseExcel, extractExcel, parsePdf, extractPdf, analyze, handleFile };

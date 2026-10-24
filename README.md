@@ -57,7 +57,7 @@ Ubah `src/app.src.html`, lalu jalankan:
 python tools/build.py
 ```
 
-Uji regresi (butuh Node.js dan Playwright). Uji ini membuat file Excel dan PDF dari data contoh, lalu memeriksa angka, narasi, cek neraca, dan keamanan tampilan:
+Uji regresi (butuh Node.js dan Playwright). Uji ini membuat file Excel dan PDF dari data perusahaan fiktif di `tools/data-uji.json`, lalu memeriksa angka, narasi, cek neraca, keamanan tampilan, dan hasil cetak:
 
 ```
 node tools/uji-regresi.js

@@ -103,8 +103,9 @@ const halamanLapkeu = (judul, satuan, baris) => `<section style="page-break-afte
   const beda = Object.keys(acuan).filter(k => ['c', 'p'].some(per => (acuan[k][per] ?? null) !== (hasil[k]?.[per] ?? null)));
   cek('Excel pulang-pergi sama dengan data uji', !beda.length && Object.keys(hasil).length === Object.keys(acuan).length, 'beda: ' + beda.join(', '));
   const utang = await nilai(p, 'debt'), capex = await nilai(p, 'capex');
-  cek('utang berbunga data uji (utang bank jangka pendek + jatuh tempo + jangka panjang)', dekat(utang.c, 55860000004 + 104078749973) && dekat(utang.p, 125750428309 + 55859999999 + 159938749989), JSON.stringify(utang));
-  cek('belanja modal data uji', dekat(capex.c, 360972611276), JSON.stringify(capex));
+  // utang bank jangka pendek + jatuh tempo + jangka panjang + liabilitas sewa
+  cek('utang berbunga data uji', dekat(utang.c, (0 + 50e3 + 150e3 + 20e3) * 1e6) && dekat(utang.p, (100e3 + 50e3 + 200e3 + 25e3) * 1e6), JSON.stringify(utang));
+  cek('belanja modal data uji', dekat(capex.c, 230e9), JSON.stringify(capex));
 
   // 3. XSS lewat isian tanggal
   await muatExcel(p, 'xss.xlsx', { info: { 'Current period end date': '<img src=x onerror="window.__xss=1">', 'Prior year end date': '"><svg onload="window.__xss=2">' } });
@@ -119,7 +120,7 @@ const halamanLapkeu = (judul, satuan, baris) => `<section style="page-break-afte
 
   // 4. Ekuitas negatif dan rugi
   await muatExcel(p, 'ekuitas-negatif.xlsx', { ops: [
-    { re: '^Total equity', set: { c: -200e9 } }, { re: '^Total liabilities$', set: { c: 2046.79e9 } },
+    { re: '^Total equity', set: { c: -200e9 } }, { re: '^Total liabilities$', set: { c: 2078e9 } },
     { re: '^Total profit \\(loss\\)$|attributable to parent', set: { c: -150e9 } }, { re: 'per share', set: { c: -18.8 } },
   ] });
   h = await baca(p);
@@ -133,7 +134,7 @@ const halamanLapkeu = (judul, satuan, baris) => `<section style="page-break-afte
   await p.fill('#price', '');
 
   // 5. Cek keseimbangan neraca tidak boleh lolos dengan sendirinya
-  await muatExcel(p, 'tanpa-total-liabilitas.xlsx', { ops: [{ re: '^Total liabilities$', remove: true }, { re: '^Total equity', set: { c: 1603651121821 * 1.1 } }] });
+  await muatExcel(p, 'tanpa-total-liabilitas.xlsx', { ops: [{ re: '^Total liabilities$', remove: true }, { re: '^Total equity', set: { c: 1568e9 * 1.1 } }] });
   h = await baca(p);
   cek('ekuitas digelembungkan 10% terdeteksi tidak seimbang', h.neraca === 'Tidak seimbang', h.neraca);
   await muatExcel(p, 'tanpa-liabilitas.xlsx', { ops: [{ re: '^Total (current |non-current )?liabilities$', remove: true }] });
@@ -151,7 +152,7 @@ const halamanLapkeu = (judul, satuan, baris) => `<section style="page-break-afte
     { re: '^Total net cash flows received from \\(used in\\) investing', before: { k: 'cf', s: '3510000', id: 'Pembayaran untuk perolehan tanaman produktif', en: 'Payments for acquisition of bearer plants', c: 100e9, p: 0 } },
   ] });
   cek('investasi sukuk di sisi aset tidak dihitung sebagai utang', dekat((await nilai(p, 'debt')).c, utang.c), JSON.stringify(await nilai(p, 'debt')));
-  cek('belanja modal mencakup tanaman produktif', dekat((await nilai(p, 'capex')).c, 460972611276), JSON.stringify(await nilai(p, 'capex')));
+  cek('belanja modal mencakup tanaman produktif', dekat((await nilai(p, 'capex')).c, 330e9), JSON.stringify(await nilai(p, 'capex')));
 
   // 8. File yang bukan laporan keuangan
   await p.evaluate(async () => {
@@ -207,15 +208,15 @@ const halamanLapkeu = (judul, satuan, baris) => `<section style="page-break-afte
   // 11. PDF satuan penuh dengan nomor catatan
   const pdfPenuh = path.join(tmp, 'auditan-penuh.pdf');
   await buatPdf(ctx, pdfPenuh, halamanLapkeu('LAPORAN POSISI KEUANGAN', 'Rupiah penuh', [
-    ['Kas dan setara kas', '4', '131.656.343.855', '54.046.280.445', 'Cash and cash equivalents'],
-    ['Jumlah aset', '', '1.846.793.826.953', '1.373.383.918.028', 'Total assets'],
-    ['Jumlah liabilitas', '', '243.142.705.132', '402.346.269.382', 'Total liabilities'],
-    ['Jumlah ekuitas', '', '1.603.651.121.821', '971.037.648.646', 'Total equity'],
+    ['Kas dan setara kas', '4', '180.000.000.000', '95.000.000.000', 'Cash and cash equivalents'],
+    ['Jumlah aset', '', '1.878.000.000.000', '1.615.000.000.000', 'Total assets'],
+    ['Jumlah liabilitas', '', '310.000.000.000', '452.000.000.000', 'Total liabilities'],
+    ['Jumlah ekuitas', '', '1.568.000.000.000', '1.163.000.000.000', 'Total equity'],
   ]));
   await p.setInputFiles('#file', pdfPenuh);
   await p.waitForFunction(() => /penuh\.pdf/.test(document.querySelector('#status').textContent) && /^(Selesai|Gagal)/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
   h = await baca(p);
-  cek('PDF satuan penuh: kas dan neraca terbaca', await p.evaluate(() => CURRENT.S.cash?.c === 131656343855 && CURRENT.S.ta?.c === 1846793826953), h.status);
+  cek('PDF satuan penuh: kas dan neraca terbaca', await p.evaluate(() => CURRENT.S.cash?.c === 180e9 && CURRENT.S.ta?.c === 1878e9), h.status);
   cek('PDF satuan penuh: neraca seimbang', h.neraca === 'Seimbang', h.neraca);
 
   // 12. PDF tanpa teks
@@ -225,9 +226,32 @@ const halamanLapkeu = (judul, satuan, baris) => `<section style="page-break-afte
   await p.waitForFunction(() => /scan\.pdf/.test(document.querySelector('#status').textContent) && /^(Selesai|Gagal)/.test(document.querySelector('#status').textContent), null, { timeout: 60000 });
   h = await baca(p);
   cek('PDF hasil scan ditolak', /tidak berisi teks/.test(h.status), h.status);
+
+  // 13. Cetak laporan contoh: tabel "Dari mana angka ini" ikut tercetak dan tidak ada teks yang saling menimpa
+  await p.goto(APP);
+  await p.waitForFunction(() => window.__analis && typeof pdfjsLib !== 'undefined');
+  const cetak = await p.evaluate(async b64 => {
+    const data = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const doc = await pdfjsLib.getDocument({ data, isEvalSupported: false }).promise;
+    const tumpuk = [];
+    let teks = '';
+    for (let n = 1; n <= doc.numPages; n++) {
+      const items = (await (await doc.getPage(n)).getTextContent()).items.filter(i => i.str.trim())
+        .map(i => ({ s: i.str, x: i.transform[4], y: i.transform[5], w: i.width, h: i.height || Math.abs(i.transform[3]) }));
+      teks += items.map(i => i.s).join(' ') + ' ';
+      for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
+        const a = items[i], b = items[j];
+        const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+        if (ox > 2 && oy > 0.5 * Math.min(a.h, b.h)) tumpuk.push(`hal. ${n}: "${a.s}" × "${b.s}"`);
+      }
+    }
+    return { tumpuk, sumber: /sumber di laporan/i.test(teks) };
+  }, (await p.pdf({ format: 'A4' })).toString('base64'));
+  cek('cetak: tabel "Dari mana angka ini" ikut tercetak', cetak.sumber, 'tabel sumber tidak ada di PDF');
+  cek('cetak: tidak ada teks yang saling menimpa', !cetak.tumpuk.length, cetak.tumpuk.slice(0, 3).join('; '));
   cek('tidak ada galat JavaScript', !galat.length, galat.join('; '));
 
-  // 13. Tampilan ponsel
+  // 14. Tampilan ponsel
   const hp = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, deviceScaleFactor: 2 });
   const { p: ph } = await bukaHalaman(hp);
   const lebar = await ph.evaluate(() => [document.documentElement.clientWidth, document.documentElement.scrollWidth]);
